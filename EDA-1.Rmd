@@ -1,0 +1,77 @@
+---
+title: "EDA-498-Basic"
+author: "Kavita"
+date: "October 12, 2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+library(ggplot2)
+library(dplyr)
+library(sqldf)
+
+
+base_data=read.csv("C:/Users/kmalhotra/Desktop/Course/MSDS-498/brazilian-ecommerce/Complete_dataset_new.csv", stringsAsFactors = FALSE)
+base_data$customer_id = trimws(base_data$customer_id)
+
+base_data$customer_city=as.factor(base_data$customer_city)
+base_data$customer_state=as.factor(base_data$customer_state)
+base_data$payment_type=as.factor(base_data$payment_type)
+base_data$product_category=as.factor(base_data$product_category)
+base_data$review_score=as.factor(base_data$review_score)
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+temp=sqldf('select customer_city,count(customer_id) as Total_Customers
+            from base_data group by customer_city having count(customer_id) > 600 order by 2 desc')
+
+ggplot(temp,aes(x=customer_city,y=Total_Customers,color=customer_city,fill=customer_city))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Customer Distribution")
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r pressure1, echo=FALSE}
+temp0=sqldf('select customer_city,count(seller_id) as Total_Customers
+            from base_data group by customer_city having count(seller_id) > 600 order by 2 desc')
+
+ggplot(temp0,aes(x=customer_city,y=Total_Customers,color=customer_city,fill=customer_city))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Seller Distribution")
+```
+
+```{r pressure2, echo=FALSE}
+temp1=sqldf('select product_category,count(customer_id) as Total_Product_sold
+            from base_data group by product_category having count(customer_id)> 1000 order by 2 desc')
+
+ggplot(temp1,aes(x=product_category,y=Total_Product_sold,color=product_category,fill=product_category))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Top 20 Product Categories")
+```
+
+```{r pressure3, echo=FALSE}
+temp2=sqldf('select payment_type,count(customer_id) as Total_Product_sold
+            from base_data group by payment_type order by 2 desc')
+
+ggplot(temp2,aes(x=payment_type,y=Total_Product_sold,color=payment_type,fill=payment_type))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Product Sold by Payment Type")
+```
+
+```{r pressure4, echo=FALSE}
+temp3=sqldf('select review_score,count(order_id) as Total_reviews
+            from base_data group by review_score order by 2 desc')
+
+ggplot(temp3,aes(x=review_score,y=Total_reviews,color=review_score,fill=review_score))+geom_bar(sta='identity')+ggtitle('Review Scores Distribution')
+```
