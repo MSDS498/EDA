@@ -1,0 +1,280 @@
+---
+title: "EDA_2"
+author: "Kavita"
+date: "10/21/2019"
+output: 
+  html_document: 
+    fig_caption: yes
+    fig_height: 9
+    fig_width: 13
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars, echo=FALSE}
+library(ggplot2)
+library(dplyr)
+library(sqldf)
+library(dbplyr)
+library(lubridate)
+library(purrr)
+library(maps)
+
+
+
+base_data=read.csv("C:/Users/kmalhotra/Desktop/Course/MSDS-498/brazilian-ecommerce/Complete_dataset_new.csv", stringsAsFactors = FALSE)
+base_data$customer_id = trimws(base_data$customer_id)
+
+base_data$customer_city=as.factor(base_data$customer_city)
+base_data$customer_state=as.factor(base_data$customer_state)
+base_data$payment_type=as.factor(base_data$payment_type)
+base_data$product_category=as.factor(base_data$product_category)
+base_data$review_score=as.factor(base_data$review_score)
+base_data=na.omit(base_data)
+
+eda_data=base_data%>%select(-one_of("product_weight_g","product_photos_qty","product_length_cm","product_height_cm","product_width_cm",
+                                "X","X.1"))
+
+eda_data$order_Purchase_date=as.Date(strptime(eda_data$order_purchase_timestamp,format='%m/%d/%Y %H:%M',tz='UTC'))
+eda_data$order_delivered_date=as.Date(strptime(eda_data$order_delivered_customer_date,format='%m/%d/%Y %H:%M',tz='UTC'))
+eda_data$order_est_delivered_date=as.Date(strptime(eda_data$order_estimated_delivery_date,format='%m/%d/%Y %H:%M',tz='UTC'))
+
+eda_data$actual_turn_around_time=difftime(eda_data$order_delivered_date,eda_data$order_Purchase_date,units="days")
+eda_data$estimated_turn_around_time=difftime(eda_data$order_est_delivered_date,eda_data$order_Purchase_date,units="days")
+
+eda_data$Delivery_status=ifelse((eda_data$actual_turn_around_time - eda_data$estimated_turn_around_time)==0,
+                                "On Time",ifelse((eda_data$actual_turn_around_time - eda_data$estimated_turn_around_time)>0,"Late","Early"))
+eda_data$Delivery_status=as.factor(eda_data$Delivery_status)
+```
+
+## EDA
+## The Customer distribution shows that the most number of customers are registered from Sao Paulo followed by Ribeirao Preto.
+
+
+```{r pressure, echo=FALSE}
+temp=sqldf('select customer_city,count(customer_id) as Total_Customers
+            from base_data group by customer_city having count(customer_id) > 600 order by 2 desc')
+
+ggplot(temp,aes(x=customer_city,y=Total_Customers,color=customer_city,fill=customer_city))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Customer Distribution")
+
+
+
+```
+
+## Even for the Seller distribution shows that most number of Sellers also come from Sao Paulo 
+```{r cot, echo=FALSE}
+temp0=sqldf('select seller_city,count(seller_id) as Total_Seller
+            from base_data group by seller_city having count(seller_id) > 600 order by 2 desc')
+
+ggplot(temp0,aes(x=reorder(seller_city,-Total_Seller),y=Total_Seller,color=seller_city,fill=seller_city))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Seller Distribution")
+
+
+
+```
+
+#The most orders placed are from the following top 10 Product categories
+```{r blue, echo=FALSE}
+
+temp1=sqldf('select product_category,count(order_id) as Total_Product_sold
+            from base_data group by product_category having count(customer_id)> 4300 order by 2 desc')
+
+ggplot(temp1,aes(x=reorder(product_category,-Total_Product_sold),y=Total_Product_sold,color=product_category,fill=product_category))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Top 10 Product Categories")
+
+
+```
+
+# Credit card is the most preffered mode of payment
+```{r press, echo=FALSE}
+temp2=sqldf('select payment_type,count(order_id) as Total_Product_sold
+            from base_data group by payment_type order by 2 desc')
+
+ggplot(temp2,aes(x=reorder(payment_type,-Total_Product_sold),y=Total_Product_sold,color=payment_type,fill=payment_type))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Sales by Payment Type")
+
+
+
+```
+
+# this plot shows that better reviews corrosponds to more orders
+```{r press1, echo=FALSE}
+temp3=sqldf('select review_score,count(order_id) as Total_reviews
+            from base_data group by review_score order by 2 desc')
+ggplot(temp3,aes(x=review_score,y=Total_reviews,color=review_score,fill=review_score))+geom_bar(sta='identity')+ggtitle('Review Scores Distribution')
+
+
+
+```
+
+# We can observe here the more than 75 % of the orders are delivered earier than the estimated Delivery Date
+```{r pres, echo=FALSE}
+temp4=sqldf('select Delivery_status,count(order_id) as Total_Delivery from eda_data group by Delivery_status')
+ggplot(temp4,aes(x=Delivery_status,y=Total_Delivery,color=Delivery_status,fill=Delivery_status))+
+  geom_bar(sta='identity')+ggtitle('Order Distribution by Delivery Status')
+
+
+
+```
+
+#The plot shows that the highest concentration of Sellers is in the state Sao Paulo which can also be confirmed from the second plot in the document
+```{r pres1, echo=FALSE}
+ggplot(eda_data,aes(x=seller_state,fill=seller_state))+
+  geom_bar()+ggtitle('Sellers Distribution by State')+coord_flip()
+
+```
+
+#Seller distribution based on the Geo Locations
+```{r card, echo=FALSE}
+eda_lat_long=read.csv('C:/Users/kmalhotra/Desktop/Course/MSDS-498/brazilian-ecommerce/Merged_dataset_w_LatLong.csv', stringsAsFactors = FALSE)
+
+
+Brazil<-map_data("world")%>%filter(region=="Brazil")
+eda_lat_long = eda_lat_long[eda_lat_long$lat_seller <= 5.27438888,]
+eda_lat_long = eda_lat_long[eda_lat_long$lat_customer <= 5.27438888,]
+
+eda_lat_long$lat_seller=round(eda_lat_long$lat_seller,3)
+eda_lat_long$long_seller=round(eda_lat_long$long_seller,3)
+eda_lat_long$lat_customer=round(eda_lat_long$lat_customer,3)
+eda_lat_long$long_customer=round(eda_lat_long$long_customer,3)
+
+
+ggplot() +
+  geom_polygon(data = Brazil, aes(x=long, y = lat,group=group),fill="black")+
+  geom_point(data= eda_lat_long,aes(x=long_seller,y=lat_seller,color=seller_state,fill=seller_state),size=1) +ggtitle("Seller Geo Location")
+
+
+```
+
+```{r cord, echo=FALSE}
+ggplot() +
+  geom_polygon(data = Brazil, aes(x=long, y = lat, group = group,fill=customer_state), fill="black")+
+  geom_point(data= eda_lat_long,aes(x=long_customer,y=lat_customer,color=customer_state),size=1)+ggtitle("Customer Geo Location")
+
+
+```
+
+# We can observe here that the highest number of orders are placed in the month of Novembor and December and the trend has increased as compared to teh last year
+
+```{r pop, echo=FALSE}
+eda_data$Purchase_Month_year=strftime(eda_data$order_Purchase_date,'%b%Y')
+temp6=sqldf('select Purchase_Month_year,count(order_id) total_order from eda_data group by Purchase_Month_year order by order_Purchase_date')
+
+t=sqldf('select Purchase_Month_year,total_order from temp6 where Purchase_Month_year not like "%2016%" ')
+t$Month_Year=factor(t$Purchase_Month_year,levels=c('Jan2017','Feb2017','Mar2017','Apr2017','May2017','Jun2017','Jul2017','Aug2017','Sep2017','Oct2017','Nov2017','Dec2017','Jan2018',
+                                                   'Feb2018','Mar2018','Apr2018','May2018','Jun2018','Jul2018','Aug2018','Sep2018'))
+
+ggplot(t,aes(x=Month_Year,y=total_order,color=Month_Year,fill=Month_Year))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Orders Placed per Month")+scale_x_discrete()
+
+
+```
+
+# The Total revenue shows a positive trend over the past 3 years
+```{r prop, echo=FALSE}
+eda_data$Purchase_year=strftime(eda_data$order_Purchase_date,'%Y')
+temp7=sqldf('select Purchase_year,sum(price) total_Revenue from eda_data group by Purchase_year order by Purchase_year')
+
+ggplot(temp7,aes(x=Purchase_year,y=total_Revenue,color=Purchase_year,fill=Purchase_year))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Revenue Over Year")+scale_x_discrete()
+
+
+```
+
+# The Revenue confirms the order time plot and shows an increase during Nov and Dec because of teh festival season
+```{r prep, echo=FALSE}
+temp8=sqldf('select Purchase_Month_year,sum(price) total_Revenue from eda_data group by Purchase_Month_year order by order_Purchase_date')
+
+#t=sqldf('select Purchase_Month_year,total_Revenue from temp6 where Purchase_Month_year not like "2016%" ')
+temp8$Month_Year=factor(temp8$Purchase_Month_year,levels=c('Sep2016','Oct2016','Dec2016','Jan2017','Feb2017','Mar2017','Apr2017','May2017','Jun2017','Jul2017','Aug2017','Sep2017','Oct2017','Nov2017','Dec2017','Jan2018',
+                                                   'Feb2018','Mar2018','Apr2018','May2018','Jun2018','Jul2018','Aug2018','Sep2018'))
+
+ggplot(temp8,aes(x=Month_Year,y=total_Revenue,color=Month_Year,fill=Month_Year))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Monthly Revenue")+scale_x_discrete()
+
+
+```
+
+
+```{r pad, echo=FALSE}
+temp9=sqldf('select a.Purchase_Month_year,b.Product_category,sum(a.price) total_Revenue from 
+            eda_data a join temp1 b on a.Product_category=b.Product_category
+            group by a.Purchase_Month_year,b.Product_category order by a.order_Purchase_date,b.Product_category')
+
+temp9$Month_Year=factor(temp9$Purchase_Month_year,levels=c('Sep2016','Oct2016','Dec2016','Jan2017','Feb2017','Mar2017','Apr2017','May2017','Jun2017','Jul2017','Aug2017','Sep2017','Oct2017','Nov2017','Dec2017','Jan2018',
+                                                           'Feb2018','Mar2018','Apr2018','May2018','Jun2018','Jul2018','Aug2018','Sep2018'))
+
+ggplot(temp9,aes(x=Month_Year,y=total_Revenue,color=product_category,fill=product_category))+geom_bar(stat='identity')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ggtitle("Monthly Revenue")+scale_x_discrete()
+
+
+
+```
+
+## Cluster Analysis
+```{r cop, echo=FALSE}
+library(cluster)  # clustering algorithms
+library(factoextra)
+library(Imap)  
+library(lattice)
+library(caret)
+eda_data=na.omit(eda_data)
+eda_lat_long=na.omit(eda_lat_long)
+
+
+
+dist_list <- list()
+
+for (i in 1:nrow(eda_lat_long)) {
+  
+  dist_list[[i]] <- gdist(lon.1 = eda_lat_long$long_seller[i], 
+                          lat.1 = eda_lat_long$lat_seller[i], 
+                          lon.2 = eda_lat_long$long_customer[i], 
+                          lat.2 = eda_lat_long$lat_customer[i], 
+                          units="miles")
+  
+}
+eda_lat_long$dist=as.integer(dist_list)
+lat_data=eda_lat_long%>%select(customer_id,dist)
+fnl_data=sqldf('select a.order_id,a.payment_type,a.product_category,a.order_item_id,a.price,a.freight_value,a.payment_value,a.payment_installments,
+               (a.actual_turn_around_time - a.estimated_turn_around_time) as total_delivery_time from eda_data a join eda_lat_long b on a.customer_id=b.customer_id')
+fnl_data=na.omit(fnl_data)
+
+set.seed(32123)
+#preproc <- preProcess(fnl_data[4:7], method = c("range"))
+#cluster_data <- predict(preproc, fnl_data)
+cluster_data=scale(fnl_data[4:9])
+
+Tot <- kmeans(fnl_data[4:9], centers = 7)
+#fit=kmeans(cluster_data,7)
+
+wss <- 0
+for (i in 1:10) {
+  wss[i] <- sum(kmeans(fnl_data[4:9],centers=i)$withinss)
+}
+
+
+plot(1:10, wss, 
+     type="b", 
+     xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+
+
+```
+
+```{r cod, echo=FALSE}
+#fit$withinss
+fviz_cluster(Tot, fnl_data[4:9])
+
+```
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
